@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ChainGuardian</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    width: 300px;
+    background: #090915;
+    color: #e0e0f0;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    padding: 20px;
+  }
+  .logo { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+  .logo-icon { font-size: 28px; }
+  .logo-text { font-size: 16px; font-weight: 700; color: #00ff88; }
+  .logo-sub { font-size: 10px; color: #666; letter-spacing: 2px; text-transform: uppercase; }
+  .stat-row { display: flex; gap: 8px; margin-bottom: 16px; }
+  .stat {
+    flex: 1; background: #12122a; border: 1px solid #222244;
+    border-radius: 10px; padding: 12px; text-align: center;
+  }
+  .stat-num { font-size: 22px; font-weight: 700; color: #00ff88; }
+  .stat-label { font-size: 10px; color: #666; text-transform: uppercase; letter-spacing: 1px; }
+  .toggle-row {
+    display: flex; align-items: center; justify-content: space-between;
+    background: #12122a; border-radius: 10px; padding: 12px 14px;
+    margin-bottom: 12px;
+  }
+  .toggle-label { font-size: 13px; font-weight: 500; }
+  .toggle {
+    width: 40px; height: 22px; background: #00ff88;
+    border-radius: 11px; position: relative; cursor: pointer;
+    transition: background 0.2s;
+  }
+  .toggle::after {
+    content: ''; position: absolute;
+    top: 3px; left: 3px;
+    width: 16px; height: 16px;
+    background: #090915; border-radius: 50%;
+    transition: left 0.2s;
+  }
+  .toggle.off { background: #333; }
+  .toggle.off::after { left: 21px; }
+  .status {
+    text-align: center; font-size: 11px; color: #555;
+    padding-top: 8px; border-top: 1px solid #1a1a2e;
+  }
+  .status span { color: #00ff88; }
+</style>
+</head>
+<body>
+<div class="logo">
+  <div class="logo-icon">🛡️</div>
+  <div>
+    <div class="logo-text">ChainGuardian</div>
+    <div class="logo-sub">DeFi Shield · AI Powered</div>
+  </div>
+</div>
+
+<div class="stat-row">
+  <div class="stat">
+    <div class="stat-num" id="blocked-count">0</div>
+    <div class="stat-label">Blocked</div>
+  </div>
+  <div class="stat">
+    <div class="stat-num" style="color:#ff6b6b">8</div>
+    <div class="stat-label">AI Checks</div>
+  </div>
+  <div class="stat">
+    <div class="stat-num" style="color:#f0c040">₹</div>
+    <div class="stat-label">Saved</div>
+  </div>
+</div>
+
+<div class="toggle-row">
+  <span class="toggle-label">🛡️ Protection Active</span>
+  <div class="toggle" id="toggle"></div>
+</div>
+
+<div class="status">
+  Monitoring: <span>MetaMask · Rabby · OKX · Coinbase</span><br>
+  Network: <span>Sepolia Testnet</span>
+</div>
+
+<!-- ✅ MV3 REQUIRES external script — no inline scripts allowed -->
+<script src="panel.js"></script>
+</body>
+</html>

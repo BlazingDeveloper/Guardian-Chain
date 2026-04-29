@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ChainGuardian Demo dApp – Sepolia</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #060612;
+    --surface: #0d0d22;
+    --border: #1e1e3a;
+    --accent: #00ff88;
+    --danger: #ff3b3b;
+    --warn: #ff8c00;
+    --text: #e0e0f0;
+    --muted: #6b6b8a;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Space Grotesk', sans-serif;
+    min-height: 100vh;
+    padding: 40px 20px;
+  }
+
+  .container { max-width: 760px; margin: 0 auto; }
+
+  header { text-align: center; margin-bottom: 48px; }
+  .demo-badge {
+    display: inline-block;
+    background: #ff3b3b22;
+    border: 1px solid #ff3b3b44;
+    color: #ff6b6b;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 4px 12px;
+    border-radius: 20px;
+    margin-bottom: 16px;
+  }
+  h1 { font-size: 32px; font-weight: 700; margin-bottom: 8px; }
+  h1 span { color: var(--accent); }
+  .subtitle { color: var(--muted); font-size: 14px; }
+
+  .wallet-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 20px;
+    margin-bottom: 32px;
+  }
+  .wallet-addr { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); }
+  .connect-btn {
+    background: var(--accent); color: #000;
+    border: none; border-radius: 8px; padding: 8px 18px;
+    font-size: 13px; font-weight: 700; cursor: pointer;
+  }
+  .connect-btn:hover { filter: brightness(0.9); }
+
+  .scenarios { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 32px; }
+
+  .scenario-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    cursor: pointer;
+    transition: border-color 0.2s, transform 0.15s;
+  }
+  .scenario-card:hover { transform: translateY(-2px); }
+  .scenario-card.safe { border-color: #00ff8844; }
+  .scenario-card.safe:hover { border-color: var(--accent); }
+  .scenario-card.rug { border-color: #ff8c0044; }
+  .scenario-card.rug:hover { border-color: var(--warn); }
+  .scenario-card.malicious { border-color: #ff3b3b44; }
+  .scenario-card.malicious:hover { border-color: var(--danger); }
+
+  .scenario-icon { font-size: 28px; margin-bottom: 10px; }
+  .scenario-title { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+  .scenario-desc { font-size: 12px; color: var(--muted); line-height: 1.5; }
+  .scenario-risk {
+    display: inline-block;
+    margin-top: 10px;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 4px;
+  }
+  .risk-low  { background: #00ff8822; color: var(--accent); }
+  .risk-med  { background: #ff8c0022; color: var(--warn); }
+  .risk-high { background: #ff3b3b22; color: var(--danger); }
+
+  .approve-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 24px;
+    margin-bottom: 24px;
+  }
+  .approve-section h2 { font-size: 16px; font-weight: 700; margin-bottom: 16px; }
+
+  .tx-detail { display: flex; justify-content: space-between; margin-bottom: 10px; }
+  .tx-label { font-size: 13px; color: var(--muted); }
+  .tx-value { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text); }
+
+  .approve-btn {
+    width: 100%; padding: 16px;
+    background: linear-gradient(135deg, #1a1a3a, #12122a);
+    border: 1px solid #3a3a5a;
+    border-radius: 10px;
+    color: var(--text);
+    font-size: 15px; font-weight: 700;
+    cursor: pointer;
+    margin-top: 16px;
+    transition: border-color 0.2s;
+  }
+  .approve-btn:hover { border-color: #6b6baa; }
+
+  .log {
+    background: #050510;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    min-height: 80px;
+    max-height: 160px;
+    overflow-y: auto;
+  }
+  .log .entry { padding: 2px 0; }
+  .log .ok  { color: var(--accent); }
+  .log .err { color: var(--danger); }
+  .log .inf { color: #6baaff; }
+
+  footer { text-align: center; margin-top: 40px; color: var(--muted); font-size: 12px; }
+
+  @media (max-width: 600px) { .scenarios { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="demo-badge">🛡️ ChainGuardian Hackathon Demo · Sepolia Testnet</div>
+    <h1>DeFi dApp <span>Demo</span></h1>
+    <p class="subtitle">Click "Approve" on any scenario below — ChainGuardian will intercept it</p>
+  </header>
+
+  <div class="wallet-bar">
+    <div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:2px">Connected Wallet</div>
+      <div class="wallet-addr" id="wallet-addr">Not connected</div>
+    </div>
+    <button class="connect-btn" onclick="connectWallet()">Connect Wallet</button>
+  </div>
+
+  <div class="scenarios">
+    <div class="scenario-card safe" onclick="selectScenario('clean')">
+      <div class="scenario-icon">✅</div>
+      <div class="scenario-title">SafeToken</div>
+      <div class="scenario-desc">Verified contract, distributed ownership, no Slither bugs</div>
+      <span class="scenario-risk risk-low">~15% Risk</span>
+    </div>
+
+    <div class="scenario-card rug" onclick="selectScenario('rug')">
+      <div class="scenario-icon">🐋</div>
+      <div class="scenario-title">RugToken</div>
+      <div class="scenario-desc">Whale holds 82% of supply — classic rug pull setup</div>
+      <span class="scenario-risk risk-med">~65% Risk</span>
+    </div>
+
+    <div class="scenario-card malicious" onclick="selectScenario('malicious')">
+      <div class="scenario-icon">💀</div>
+      <div class="scenario-title">MaliciousContract</div>
+      <div class="scenario-desc">Reentrancy + delegatecall + unlimited approve = rug + hack</div>
+      <span class="scenario-risk risk-high">~92% Risk</span>
+    </div>
+  </div>
+
+  <div class="approve-section">
+    <h2>📋 Transaction Details</h2>
+    <div class="tx-detail">
+      <span class="tx-label">Contract</span>
+      <span class="tx-value" id="tx-contract">Select a scenario above</span>
+    </div>
+    <div class="tx-detail">
+      <span class="tx-label">Function</span>
+      <span class="tx-value" id="tx-fn">—</span>
+    </div>
+    <div class="tx-detail">
+      <span class="tx-label">Amount</span>
+      <span class="tx-value" id="tx-amount">—</span>
+    </div>
+    <div class="tx-detail">
+      <span class="tx-label">Network</span>
+      <span class="tx-value" style="color:var(--accent)">Sepolia Testnet</span>
+    </div>
+
+    <button class="approve-btn" onclick="triggerApprove()" id="approve-btn" disabled>
+      ⚡ Approve Token (ChainGuardian will intercept)
+    </button>
+  </div>
+
+  <div class="log" id="log">
+    <div class="entry inf">[ChainGuardian Demo] Select a scenario and connect your wallet to begin...</div>
+  </div>
+
+  <footer>
+    ChainGuardian v1.0 · Built for Web3 + AI Hackathon · Sepolia Testnet Only<br>
+    🇮🇳 Protecting Indian DeFi beginners from rug pulls
+  </footer>
+</div>
+
+<script>
+// Replace with your deployed Sepolia contract addresses
+const CONTRACTS = {
+  clean: "0x5957e5CD7518406C7B8410dbD5Fbf98407929142",
+  rug: "0xD54c6AF9054DB134fe2ddccc4391475f22bED17A",
+  malicious: "0xAF1F2D5Eb131C1871308861F7F4BE8B084E1e83B"
+};
+
+const MAX_UINT256 = '0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff';
+// approve(address spender, uint256 amount)
+const APPROVE_SELECTOR = '0x095ea7b3';
+
+let selectedScenario = null;
+let userAddress = null;
+
+function log(msg, type = '') {
+  const el = document.getElementById('log');
+  const entry = document.createElement('div');
+  entry.className = 'entry ' + type;
+  entry.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+  el.appendChild(entry);
+  el.scrollTop = el.scrollHeight;
+}
+
+async function connectWallet() {
+  if (!window.ethereum) {
+    alert('Please install MetaMask or Rabby!');
+    return;
+  }
+  try {
+    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+    userAddress = accounts[0];
+    document.getElementById('wallet-addr').textContent =
+      userAddress.slice(0, 6) + '...' + userAddress.slice(-4);
+    log('Wallet connected: ' + userAddress, 'ok');
+
+    // Switch to Sepolia
+    try {
+      await window.ethereum.request({
+        method: 'wallet_switchEthereumChain',
+        params: [{ chainId: '0xaa36a7' }] // Sepolia
+      });
+      log('Switched to Sepolia testnet', 'ok');
+    } catch (e) {
+      log('Please switch to Sepolia manually', 'err');
+    }
+  } catch (e) {
+    log('Connection failed: ' + e.message, 'err');
+  }
+}
+
+function selectScenario(type) {
+  selectedScenario = type;
+  const addr = CONTRACTS[type] || '0x' + type.padEnd(40, '0');
+
+  document.querySelectorAll('.scenario-card').forEach(c => c.style.opacity = '0.5');
+  document.querySelector(`.scenario-card.${type === 'clean' ? 'safe' : type}`).style.opacity = '1';
+
+  document.getElementById('tx-contract').textContent = addr.slice(0, 10) + '...' + addr.slice(-6);
+  document.getElementById('tx-fn').textContent = 'approve(address, uint256)';
+  document.getElementById('tx-amount').textContent = 'Unlimited (uint256.max)';
+  document.getElementById('approve-btn').disabled = false;
+
+  log(`Selected: ${type} contract → ${addr.slice(0,10)}...`, 'inf');
+}
+
+async function triggerApprove() {
+  if (!userAddress) { alert('Connect wallet first!'); return; }
+  if (!selectedScenario) return;
+
+  const contractAddr = CONTRACTS[selectedScenario];
+  if (!contractAddr || contractAddr.includes('YOUR')) {
+    log('⚠️ Update CONTRACTS object with your deployed Sepolia addresses!', 'err');
+    return;
+  }
+
+  // Encode approve(contractAddr, uint256.max)
+  // approve selector + padded spender address + uint256.max
+  const spenderPadded = contractAddr.toLowerCase().replace('0x', '').padStart(64, '0');
+  const amountMax = 'f'.repeat(64);
+  const calldata = APPROVE_SELECTOR + spenderPadded + amountMax;
+
+  log(`Sending approve() tx → ChainGuardian intercepting...`, 'inf');
+
+  try {
+    const txHash = await window.ethereum.request({
+      method: 'eth_sendTransaction',
+      params: [{
+        from: userAddress,
+        to: contractAddr,
+        data: calldata,
+        gas: '0x186A0' // 100k gas
+      }]
+    });
+    log('TX sent (user chose Force Approve): ' + txHash, 'ok');
+  } catch (e) {
+    if (e.message.includes('ChainGuardian') || e.message.includes('blocked')) {
+      log('🛡️ BLOCKED by ChainGuardian! User is safe.', 'ok');
+    } else if (e.message.includes('rejected')) {
+      log('User rejected in wallet popup', 'inf');
+    } else {
+      log('Error: ' + e.message, 'err');
+    }
+  }
+}
+</script>
+</body>
+</html>
