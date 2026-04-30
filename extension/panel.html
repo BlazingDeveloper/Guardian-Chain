@@ -1,90 +1,107 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-<meta charset="UTF-8">
-<title>ChainGuardian</title>
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body {
-    width: 300px;
-    background: #090915;
-    color: #e0e0f0;
-    font-family: 'Segoe UI', system-ui, sans-serif;
-    padding: 20px;
+  :root {
+    --bg: #050508;
+    --card: #0D0D15;
+    --accent: #00FF88;
+    --danger: #FF3B3B;
+    --text: #E2E8F0;
   }
-  .logo { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
-  .logo-icon { font-size: 28px; }
-  .logo-text { font-size: 16px; font-weight: 700; color: #00ff88; }
-  .logo-sub { font-size: 10px; color: #666; letter-spacing: 2px; text-transform: uppercase; }
-  .stat-row { display: flex; gap: 8px; margin-bottom: 16px; }
-  .stat {
-    flex: 1; background: #12122a; border: 1px solid #222244;
-    border-radius: 10px; padding: 12px; text-align: center;
+
+  * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', system-ui, -apple-system; }
+  
+  body { width: 340px; background: var(--bg); color: var(--text); padding: 0; overflow: hidden; }
+
+  /* Premium Header with Border-Bottom Gradient */
+  .header {
+    padding: 16px 20px;
+    display: flex; justify-content: space-between; align-items: center;
+    background: linear-gradient(to bottom, rgba(255,255,255,0.03), transparent);
+    border-bottom: 1px solid rgba(255,255,255,0.08);
   }
-  .stat-num { font-size: 22px; font-weight: 700; color: #00ff88; }
-  .stat-label { font-size: 10px; color: #666; text-transform: uppercase; letter-spacing: 1px; }
-  .toggle-row {
-    display: flex; align-items: center; justify-content: space-between;
-    background: #12122a; border-radius: 10px; padding: 12px 14px;
-    margin-bottom: 12px;
+
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .logo-shield { width: 24px; height: 24px; fill: var(--accent); filter: drop-shadow(0 0 8px var(--accent)); }
+  .brand-text { font-weight: 800; font-size: 14px; letter-spacing: -0.5px; text-transform: uppercase; }
+
+  /* The Security Pulse Animation */
+  .pulse-container {
+    padding: 30px 20px; text-align: center; position: relative;
   }
-  .toggle-label { font-size: 13px; font-weight: 500; }
-  .toggle {
-    width: 40px; height: 22px; background: #00ff88;
-    border-radius: 11px; position: relative; cursor: pointer;
-    transition: background 0.2s;
+  
+  .status-orb {
+    width: 60px; height: 60px; border-radius: 50%; background: var(--accent);
+    margin: 0 auto 15px; position: relative; display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 0 30px rgba(0, 255, 136, 0.4);
+    animation: orbFloat 3s ease-in-out infinite;
   }
-  .toggle::after {
-    content: ''; position: absolute;
-    top: 3px; left: 3px;
-    width: 16px; height: 16px;
-    background: #090915; border-radius: 50%;
-    transition: left 0.2s;
+
+  .status-orb::after {
+    content: ''; position: absolute; width: 100%; height: 100%;
+    border-radius: 50%; border: 2px solid var(--accent);
+    animation: pulseRing 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
   }
-  .toggle.off { background: #333; }
-  .toggle.off::after { left: 21px; }
-  .status {
-    text-align: center; font-size: 11px; color: #555;
-    padding-top: 8px; border-top: 1px solid #1a1a2e;
+
+  @keyframes pulseRing {
+    0% { transform: scale(1); opacity: 0.8; }
+    100% { transform: scale(1.8); opacity: 0; }
   }
-  .status span { color: #00ff88; }
+
+  @keyframes orbFloat {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
+  }
+
+  /* Stats Grid */
+  .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 0 20px 20px; }
+  .stat-item {
+    background: var(--card); border: 1px solid rgba(255,255,255,0.05);
+    padding: 12px 5px; border-radius: 12px; text-align: center;
+    transition: transform 0.2s;
+  }
+  .stat-item:hover { transform: scale(1.05); border-color: rgba(255,255,255,0.15); }
+  .stat-num { display: block; font-size: 18px; font-weight: 900; }
+  .stat-label { font-size: 9px; color: #666; text-transform: uppercase; letter-spacing: 1px; }
+
+  /* The Switch */
+  .footer-action { padding: 15px 20px; background: rgba(255,255,255,0.02); border-top: 1px solid rgba(255,255,255,0.05); }
+  .toggle-container {
+    display: flex; justify-content: space-between; align-items: center;
+    background: rgba(0, 255, 136, 0.08); border-radius: 14px; padding: 12px 16px;
+    border: 1px solid rgba(0, 255, 136, 0.2);
+  }
 </style>
 </head>
 <body>
-<div class="logo">
-  <div class="logo-icon">🛡️</div>
-  <div>
-    <div class="logo-text">ChainGuardian</div>
-    <div class="logo-sub">DeFi Shield · AI Powered</div>
+  <div class="header">
+    <div class="brand">
+      <svg class="logo-shield" viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg>
+      <span class="brand-text">Chain<span style="color:var(--accent)">Guardian</span></span>
+    </div>
+    <div style="font-size: 9px; color: #444; border: 1px solid #222; padding: 2px 6px; border-radius: 4px;">v1.0.0</div>
   </div>
-</div>
 
-<div class="stat-row">
-  <div class="stat">
-    <div class="stat-num" id="blocked-count">0</div>
-    <div class="stat-label">Blocked</div>
+  <div class="pulse-container">
+    <div class="status-orb"><svg style="width:24px; height:24px; fill:#000" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></div>
+    <h2 style="font-size: 16px; font-weight: 800;">PROTECTION ACTIVE</h2>
+    <p style="font-size: 11px; color: #666; margin-top: 4px;">Monitoring all EVM transactions</p>
   </div>
-  <div class="stat">
-    <div class="stat-num" style="color:#ff6b6b">8</div>
-    <div class="stat-label">AI Checks</div>
+
+  <div class="stats-grid">
+    <div class="stat-item"><span class="stat-num" style="color:var(--accent)">14</span><span class="stat-label">Checks</span></div>
+    <div class="stat-item"><span class="stat-num" style="color:var(--danger)">2</span><span class="stat-label">Blocked</span></div>
+    <div class="stat-item"><span class="stat-num" style="color:#F0C040">₹</span><span class="stat-label">Saved</span></div>
   </div>
-  <div class="stat">
-    <div class="stat-num" style="color:#f0c040">₹</div>
-    <div class="stat-label">Saved</div>
+
+  <div class="footer-action">
+    <div class="toggle-container">
+      <div style="font-size: 12px; font-weight: 700; color:var(--accent)">AI SCANNER</div>
+      <div style="width: 34px; height: 18px; background: var(--accent); border-radius: 10px; position: relative;">
+        <div style="width: 14px; height: 14px; background: #000; border-radius: 50%; position: absolute; right: 2px; top: 2px;"></div>
+      </div>
+    </div>
   </div>
-</div>
-
-<div class="toggle-row">
-  <span class="toggle-label">🛡️ Protection Active</span>
-  <div class="toggle" id="toggle"></div>
-</div>
-
-<div class="status">
-  Monitoring: <span>MetaMask · Rabby · OKX · Coinbase</span><br>
-  Network: <span>Sepolia Testnet</span>
-</div>
-
-<!-- ✅ MV3 REQUIRES external script — no inline scripts allowed -->
-<script src="panel.js"></script>
 </body>
 </html>

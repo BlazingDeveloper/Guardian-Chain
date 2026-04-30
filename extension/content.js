@@ -1,9 +1,9 @@
-
 // =====================================================================
 // 🛡️ LAYER 1: ZERO-DAY PHISHING & TYPOSQUATTING DEFENSE
 // =====================================================================
 
 const PROTECTED_DOMAINS = [
+  'app.uniswap.org', // <--- Add this just for the demo
   'uniswap.org',
   'aave.com',
   'opensea.io',
@@ -32,23 +32,19 @@ function levenshteinDistance(a, b) {
   return matrix[b.length][a.length];
 }
 
-// This function returns a warning string if phishing is detected, or null if safe
 function checkDomainPhishing() {
   const currentHostname = window.location.hostname.replace(/^www\./, '').toLowerCase();
-
   if (PROTECTED_DOMAINS.includes(currentHostname) || currentHostname === 'localhost' || currentHostname === '127.0.0.1') {
-    return null; // Safe
+    return null; 
   }
-
   for (const target of PROTECTED_DOMAINS) {
     const distance = levenshteinDistance(currentHostname, target);
     if (distance > 0 && distance <= 2 && Math.abs(currentHostname.length - target.length) <= 2) {
       return { fake: currentHostname, real: target };
     }
   }
-  return null; // Safe
+  return null; 
 }
-
 
 console.log("🔥 ChainGuardian MAIN WORLD HOOKED");
 (function () {
@@ -68,89 +64,71 @@ console.log("🔥 ChainGuardian MAIN WORLD HOOKED");
       if (method === 'eth_sendTransaction' && params && params[0]) {
         const tx = params[0];
         // HACKATHON DEMO MODE: Intercept ALL transactions
-        const isHighRisk = true;
-        /*const isHighRisk = tx.data && (
-          tx.data.startsWith('0x095ea7b3') || // approve
-          tx.data.startsWith('0xe8fffeb5') || // addLiquidity
-          tx.data.startsWith('0x38ed1739') || // swapExactTokensForTokens
-          tx.data.startsWith('0xa9059cbb')    // transfer
-        ); */
+        const isHighRisk = true; 
 
         if (isHighRisk) {
           try {
             const result = await analyzeTransaction(tx);
 
             if (result.risk >= RISK_THRESHOLD) {
-              // FIX #2 & #3: Use the custom popup UI and the correct field (aiExplain)
               const userChoice = await showRiskPopup(result, tx);
 
               if (userChoice === 'block') {
                 console.log('[ChainGuardian] BLOCKED');
                 const err = new Error('ChainGuardian: transaction blocked by user');
-                err.code = 4001; // EIP-1193 user rejected — prevents dApp retry loops
+                err.code = 4001; 
                 return Promise.reject(err);
               } else {
                 logIntent(tx, result).catch(() => {});
                 return originalRequest(args);
               }
             }
-
             return originalRequest(args);
-
           } catch (e) {
             console.warn('[ChainGuardian] Error:', e.message);
             return Promise.reject(e);
           }
         }
       }
-
       return originalRequest(args);
     };
-  } // FIX #1: This closing brace was missing — patchProvider is now properly closed
+  } 
 
   // ─── Analyze transaction via backend ─────────────────────────────────────────
-// ─── Analyze transaction via backend (REAL CONNECTION) ─────────────────────
-async function analyzeTransaction(tx) {
-  return new Promise((resolve) => {
-    // 1. Listen for the response first
-    window.addEventListener('CG_RESPONSE_READY', (e) => {
-      try {
-        const data = JSON.parse(e.detail);
-        resolve(data);
-      } catch (err) {
-        resolve(localFallbackCheck(tx));
-      }
-    }, { once: true });
+  async function analyzeTransaction(tx) {
+    return new Promise((resolve) => {
+      window.addEventListener('CG_RESPONSE_READY', (e) => {
+        try {
+          const data = JSON.parse(e.detail);
+          resolve(data);
+        } catch (err) {
+          resolve(localFallbackCheck(tx));
+        }
+      }, { once: true });
 
-    // 2. Dispatch the request to the bridge as a string
-    const payload = JSON.stringify({ tx });
-    const event = new CustomEvent('CG_REQUEST_ANALYSIS', { detail: payload });
-    window.dispatchEvent(event);
+      const payload = JSON.stringify({ tx });
+      const event = new CustomEvent('CG_REQUEST_ANALYSIS', { detail: payload });
+      window.dispatchEvent(event);
 
-    // 3. Fallback if background doesn't respond in 5 seconds
-    setTimeout(() => resolve(localFallbackCheck(tx)), 5000);
-  });
-}
+      setTimeout(() => resolve(localFallbackCheck(tx)), 15000);
+    });
+  }
 
   // ─── Local fallback when backend is down ─────────────────────────────────────
   function localFallbackCheck(tx) {
     let score = 0;
     const flags = [];
 
-    // Check unlimited approval (uint256.max)
     if (tx.data && tx.data.includes('ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff')) {
       score += 35;
       flags.push('Unlimited approval detected');
     }
 
-    // FIX #4: Check for zero-address recipient (a genuine risk signal) instead
-    // of the broken mixed-case check which flagged valid checksummed addresses
     if (!tx.to || tx.to === '0x0000000000000000000000000000000000000000') {
       score += 30;
       flags.push('Zero or missing recipient address');
     }
 
-    // FIX #5: Return aiExplain (not message) to match what showRiskPopup expects
     return {
       risk: Math.min(score, 100),
       aiExplain: '⚠️ Backend offline – basic check only. ' + (flags.join(', ') || 'No local flags found.'),
@@ -161,9 +139,9 @@ async function analyzeTransaction(tx) {
     };
   }
 
-  // ─── Show risk popup ──────────────────────────────────────────────────────────
-// ─── Show risk popup ──────────────────────────────────────────────────────────
-// ─── Show risk popup ──────────────────────────────────────────────────────────
+  // ─── Show risk popup ─────────────────────────────────────────────────────────
+  // ─── Show risk popup ─────────────────────────────────────────────────────────
+// ─── Show risk popup ─────────────────────────────────────────────────────────
 function showRiskPopup(result, tx) {
   return new Promise((resolve) => {
     const existing = document.getElementById('cg-overlay');
@@ -172,289 +150,190 @@ function showRiskPopup(result, tx) {
     const overlay = document.createElement('div');
     overlay.id = 'cg-overlay';
 
-    // 1. DYNAMIC UI LOGIC
     const riskColor = result.risk >= 80 ? '#FF3B3B' : result.risk >= 50 ? '#FF8C00' : '#00FF88';
-    const riskEmoji = result.risk >= 80 ? '🚨' : result.risk >= 50 ? '⚠️' : '✅';
-    const riskLabel = result.risk >= 80 ? 'DANGER' : result.risk >= 50 ? 'HIGH RISK' : 'SAFE / SECURE';
+    const riskLabel = result.risk >= 80 ? 'CRITICAL DANGER' : result.risk >= 50 ? 'HIGH RISK' : 'LOW RISK';
 
-    // 2. DYNAMIC HINDI MESSAGING
-    let hindiMsg = `🇮🇳 यह लेनदेन सुरक्षित है। ${result.risk}% जोखिम – आप आगे बढ़ सकते हैं।`;
-    if (result.risk >= 80) hindiMsg = `🇮🇳 यह लेनदेन खतरनाक है! ${result.risk}% जोखिम – अपना पैसा बचाएं, BLOCK करें! 🛑`;
-    else if (result.risk >= 50) hindiMsg = `🇮🇳 चेतावनी! ${result.risk}% जोखिम – सावधानी से सोचें।`;
+    let pillHtml = result.risk < 50 
+      ? `<div class="cg-pill" style="background: rgba(0, 255, 136, 0.15); color: #00ff88; border: 1px solid rgba(0, 255, 136, 0.3);"><span>✓</span> VERIFIED SAFE</div>`
+      : `<div class="cg-pill" style="background: rgba(255, 59, 59, 0.15); color: #FF3B3B; border: 1px solid rgba(255, 59, 59, 0.3);"><span>🚨</span> MALICIOUS TARGET</div>`;
 
-    // 3. CHECK FOR DOMAIN PHISHING 
+    const rawAiText = result.aiExplain || 'Risk signals detected.';
+    const aiSentences = rawAiText.split('. ').filter(s => s.trim().length > 0);
+    const aiBulletsHtml = aiSentences.map(sentence => `
+      <div class="cg-ai-bullet">
+        <span class="cg-bullet-icon">✦</span>
+        <span class="cg-bullet-text">${escHtml(sentence.replace(/\.$/, ''))}.</span>
+      </div>
+    `).join('');
+
+    let hindiMsg = result.risk >= 80 
+      ? `🇮🇳 यह लेनदेन खतरनाक है! ${result.risk}% जोखिम – अपना पैसा बचाएं, BLOCK करें! 🛑`
+      : `🇮🇳 यह लेनदेन सुरक्षित है। ${result.risk}% जोखिम – आप आगे बढ़ सकते हैं।`;
+
     const domainWarning = checkDomainPhishing();
-    const domainHtml = domainWarning 
-      ? `<div id="cg-domain-alert">
-           <strong>🚨 DOMAIN ALERT:</strong> You are visiting <span style="text-decoration:line-through">${domainWarning.fake}</span>. 
-           This is a known typosquatting attack simulating <span style="text-decoration:underline">${domainWarning.real}</span>.
-         </div>`
-      : '';
 
-    const slitherHtml = result.slither && result.slither.length > 0
-      ? result.slither.slice(0, 3).map(s =>
-          `<div class="cg-bug">🔴 Slither: ${escHtml(s)}</div>`
-        ).join('')
-      : '';
-
-    const whaleHtml = result.whale > 0
-      ? `<div class="cg-check">🐋 Whale concentration: <strong>${result.whale}%</strong> (top holder)</div>`
-      : '';
+    // DYNAMIC BUTTON LOGIC
+    let actionBtnsHtml = '';
+    if (result.risk < 50) {
+      // Safe UI
+      actionBtnsHtml = `
+        <button id="cg-btn-cancel" class="cg-btn-secondary">Go Back</button>
+        <button id="cg-btn-proceed" class="cg-btn-primary-safe">✅ Proceed Safely</button>
+      `;
+    } else {
+      // Danger UI
+      actionBtnsHtml = `
+        <button id="cg-btn-block" class="cg-btn-primary-danger">🛡️ BLOCK TRANSACTION</button>
+        <button id="cg-btn-force" class="cg-btn-secondary">Force Approve</button>
+      `;
+    }
 
     overlay.innerHTML = `
       <style>
         #cg-overlay {
           position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-          background: rgba(0,0,0,0.82);
+          background: rgba(4, 4, 9, 0.9);
           z-index: 2147483647;
           display: flex; align-items: center; justify-content: center;
           font-family: 'Segoe UI', system-ui, sans-serif;
-          backdrop-filter: blur(4px);
+          backdrop-filter: blur(8px);
         }
-        #cg-card {
-          background: #0D0D1A;
-          border: 2px solid ${riskColor};
-          border-radius: 16px;
-          padding: 28px 32px;
-          max-width: 480px; width: 90%;
-          box-shadow: 0 0 60px ${riskColor}44;
-          animation: cgSlideIn 0.3s cubic-bezier(0.34,1.56,0.64,1);
-        }
-        @keyframes cgSlideIn {
-          from { transform: translateY(-30px) scale(0.95); opacity: 0; }
-          to   { transform: translateY(0) scale(1); opacity: 1; }
-        }
-        #cg-risk-badge {
-          font-size: 42px; font-weight: 900;
-          color: ${riskColor};
-          text-align: center; margin: 8px 0 4px;
-          text-shadow: 0 0 30px ${riskColor}88;
-        }
-        #cg-label {
-          text-align: center; color: ${riskColor};
-          font-size: 13px; font-weight: 700; letter-spacing: 3px;
-          text-transform: uppercase; margin-bottom: 16px;
-        }
-        #cg-domain-alert {
-          background: #4A0000; border-left: 4px solid #FF3B3B;
-          color: #FFB3B3; font-size: 13px; padding: 10px;
-          border-radius: 6px; margin-bottom: 14px;
-          line-height: 1.4;
-        }
-        #cg-title { font-size: 18px; font-weight: 700; color: #fff; margin-bottom: 4px; }
-        #cg-ai { color: #ccc; font-size: 14px; line-height: 1.5; margin-bottom: 14px; border-left: 3px solid ${riskColor}; padding-left: 10px; }
-        .cg-check { color: #bbb; font-size: 13px; margin: 5px 0; }
-        .cg-bug { color: #ff6b6b; font-size: 13px; margin: 5px 0; background: #1a0808; padding: 4px 8px; border-radius: 4px; }
-        #cg-hindi { color: #f0c040; font-size: 13px; background: #1a1500; border-radius: 6px; padding: 8px 10px; margin: 12px 0; }
-        #cg-btns { display: flex; gap: 12px; margin-top: 18px; }
-        #cg-block {
-          flex: 1; background: #FF3B3B; color: #fff;
-          border: none; border-radius: 10px; padding: 14px;
-          font-size: 15px; font-weight: 700; cursor: pointer;
-          transition: transform 0.1s, box-shadow 0.2s;
-        }
-        #cg-block:hover { transform: scale(1.02); box-shadow: 0 0 20px #FF3B3B88; }
-        #cg-force {
-          flex: 1; background: transparent; color: #888;
-          border: 1px solid #444; border-radius: 10px; padding: 14px;
-          font-size: 13px; cursor: pointer;
-        }
-        #cg-force:hover { border-color: #888; color: #ccc; }
-        #cg-contract { font-size: 11px; color: #555; word-break: break-all; margin-top: 10px; }
-        #cg-loading { color: #888; font-size: 12px; text-align: center; margin-top: 8px; }
-        #cg-offline { color: #FF8C00; font-size: 11px; text-align: center; padding: 4px; }
-      </style>
-      <div id="cg-card">
-        <div style="text-align:center; font-size:28px">${riskEmoji}</div>
-        <div id="cg-risk-badge">${result.risk}% ${riskLabel}</div>
-        <div id="cg-label">ChainGuardian AI Analysis</div>
         
-        ${domainHtml} <!-- This is where the domain alert is injected! -->
+        #cg-card {
+          background: rgba(13, 13, 21, 0.85);
+          position: relative;
+          overflow: hidden; 
+          border: 1px solid transparent; 
+          border-image: linear-gradient(to bottom right, ${riskColor}, rgba(255,255,255,0.1)) 1;
+          backdrop-filter: blur(20px); 
+          -webkit-backdrop-filter: blur(20px);
+          padding: 32px;
+          max-width: 480px; width: 95%;
+          max-height: 90vh;
+          overflow-y: auto;
+          animation: cgSlideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
 
-        ${result.offline ? '<div id="cg-offline">⚡ Offline mode – backend unreachable</div>' : ''}
-        <div id="cg-ai">${escHtml(result.aiExplain || 'Risk signals detected.')}</div>
-        ${whaleHtml}
-        ${slitherHtml}
-        ${result.checks && result.checks.unlimited ? '<div class="cg-bug">🔴 Unlimited approval (uint256.max) detected</div>' : ''}
-        ${result.checks && result.checks.unverified ? '<div class="cg-check">❌ Contract source unverified on Etherscan</div>' : ''}
-        ${result.checks && result.checks.drainDetected ? '<div class="cg-bug">🔴 Balance drain detected in simulation</div>' : ''}
-        <div id="cg-hindi">
-          ${hindiMsg}
+        #cg-card::after {
+          content: ''; position: absolute; top: -50%; left: -150%; width: 200%; height: 200%;
+          background: linear-gradient(45deg, transparent, rgba(255,255,255,0.05), transparent);
+          transform: rotate(45deg);
+          animation: scanRay 3s ease-in-out infinite;
+          pointer-events: none;
+        }
+
+        @keyframes scanRay { 0% { left: -150%; } 100% { left: 150%; } }
+
+        #cg-risk-score {
+          font-size: 72px; font-weight: 950; letter-spacing: -4px; margin: 0;
+          background: linear-gradient(to bottom, #fff, ${riskColor});
+          -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+          filter: drop-shadow(0 0 25px ${riskColor}66);
+          line-height: 1;
+        }
+
+        #cg-card::-webkit-scrollbar { width: 6px; }
+        #cg-card::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+
+        @keyframes cgSlideIn { from { transform: translateY(40px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        
+        .cg-pill { display: inline-flex; align-items: center; gap: 6px; padding: 6px 16px; border-radius: 30px; font-size: 11px; font-weight: 800; text-transform: uppercase; margin-bottom: 16px; }
+        .cg-ai-bullet { display: flex; align-items: flex-start; gap: 10px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.05); padding: 12px 16px; border-radius: 12px; margin-bottom: 8px; }
+        .cg-bullet-icon { color: ${riskColor}; font-size: 14px; }
+        .cg-bullet-text { color: #E2E8F0; font-size: 14px; line-height: 1.5; }
+
+        #cg-details-pane { display: none; margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 20px; }
+        .cg-table { width: 100%; border-collapse: collapse; font-size: 12px; background: #000; border-radius: 8px; }
+        .cg-table th { color: #666; padding: 10px; text-align: left; }
+        .cg-table td { padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.05); color: #ccc; }
+        .cg-highlight { color: ${riskColor}; font-weight: 700; }
+
+        #cg-toggle-details { background: transparent; color: #888; border: none; font-size: 11px; cursor: pointer; margin: 16px auto; display: block; text-transform: uppercase; }
+        #cg-hindi { color: #f0c040; font-size: 13px; background: rgba(240, 192, 64, 0.1); border-radius: 8px; padding: 12px; margin-bottom: 20px; border: 1px solid rgba(240, 192, 64, 0.2); text-align: center; }
+        
+        /* DYNAMIC BUTTON STYLES */
+        #cg-btns { display: flex; gap: 12px; }
+        .cg-btn-primary-danger { flex: 1; background: #FF3B3B; color: #fff; border: none; border-radius: 12px; padding: 16px; font-weight: 800; font-size: 14px; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 15px rgba(255,59,59,0.3); }
+        .cg-btn-primary-danger:hover { transform: translateY(-2px); filter: brightness(1.1); box-shadow: 0 8px 25px rgba(255,59,59,0.5); }
+        
+        .cg-btn-primary-safe { flex: 1; background: #00FF88; color: #000; border: none; border-radius: 12px; padding: 16px; font-weight: 800; font-size: 14px; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 15px rgba(0,255,136,0.3); }
+        .cg-btn-primary-safe:hover { transform: translateY(-2px); filter: brightness(1.1); box-shadow: 0 8px 25px rgba(0,255,136,0.5); }
+        
+        .cg-btn-secondary { flex: 1; background: rgba(255,255,255,0.03); color: #888; border: 1px solid #333; border-radius: 12px; padding: 16px; font-weight: 600; font-size: 13px; cursor: pointer; transition: all 0.2s; }
+        .cg-btn-secondary:hover { border-color: #666; color: #fff; background: rgba(255,255,255,0.08); }
+      </style>
+      
+      <div id="cg-card">
+        <div style="text-align: center; margin-bottom: 24px;">
+          ${pillHtml}
+          <h1 id="cg-risk-score">${result.risk}%</h1>
+          <p style="color: ${riskColor}; font-size: 11px; font-weight: 800; letter-spacing: 4px; text-transform: uppercase;">${riskLabel}</p>
         </div>
-        <div id="cg-contract">📍 Contract: ${tx.to || 'Unknown'}</div>
+        
+        <div id="cg-ai-container">${aiBulletsHtml}</div>
+
+        <button id="cg-toggle-details">📊 View Analysis Data ▾</button>
+
+        <div id="cg-details-pane">
+          <table class="cg-table">
+            <thead><tr><th>Factor</th><th>Value</th><th>Impact</th></tr></thead>
+            <tbody>
+              <tr><td>Domain</td><td>${domainWarning ? `<span style="color:#FF3B3B">Phishing: ${domainWarning.fake}</span>` : 'Verified Safe'}</td><td class="cg-highlight">${domainWarning ? 'FATAL' : '+0'}</td></tr>
+              <tr><td>Whale</td><td>${result.whale > 0 ? result.whale + '% Top Holder' : 'Decentralized'}</td><td class="cg-highlight">+${result.whale > 50 ? '25' : '0'}</td></tr>
+              <tr><td>Slither</td><td>${result.slither ? result.slither.length : 0} Vulnerabilities</td><td class="cg-highlight">+${result.slither && result.slither.length > 0 ? '20' : '0'}</td></tr>
+              <tr><td>Approval</td><td>${result.checks && result.checks.unlimited ? '<span style="color:#FF3B3B">uint256.max</span>' : 'Standard Limit'}</td><td class="cg-highlight">+${result.checks && result.checks.unlimited ? '20' : '0'}</td></tr>
+              <tr><td>Simulation</td><td>${result.checks && result.checks.drainDetected ? '<span style="color:#FF3B3B">Balance Drain</span>' : 'Safe Execution'}</td><td class="cg-highlight">+${result.checks && result.checks.drainDetected ? '25' : '0'}</td></tr>
+              <tr><td>GoPlus API</td><td>${result.checks && result.checks.honeypot ? '<span style="color:#FF3B3B">Honeypot Detected</span>' : 'Clean Token'}</td><td class="cg-highlight">+${result.checks && result.checks.honeypot ? 'FATAL' : '0'}</td></tr>
+            </tbody>
+          </table>
+        </div>
+        
+        <div id="cg-hindi">${hindiMsg}</div>
+        
         <div id="cg-btns">
-          <button id="cg-block">🛡️ BLOCK SAFE</button>
-          <button id="cg-force">⚡ Force Approve →</button>
+          ${actionBtnsHtml}
         </div>
-        <div id="cg-loading">ChainGuardian v1.0 | Sepolia Demo | 8-check AI engine</div>
       </div>
     `;
 
     document.body.appendChild(overlay);
 
-    document.getElementById('cg-block').onclick = () => {
-      overlay.remove();
-      resolve('block');
-    };
+    // DYNAMIC BUTTON LISTENERS
+    if (result.risk < 50) {
+      document.getElementById('cg-btn-proceed').onclick = () => { overlay.remove(); resolve('approve'); };
+      document.getElementById('cg-btn-cancel').onclick = () => { overlay.remove(); resolve('block'); };
+    } else {
+      document.getElementById('cg-btn-block').onclick = () => { overlay.remove(); resolve('block'); };
+      document.getElementById('cg-btn-force').onclick = () => { overlay.remove(); resolve('approve'); };
+    }
+    
+    const toggleBtn = document.getElementById('cg-toggle-details');
+    const detailsPane = document.getElementById('cg-details-pane');
 
-    document.getElementById('cg-force').onclick = () => {
-      overlay.remove();
-      resolve('approve');
+    toggleBtn.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (detailsPane.style.display === 'block') {
+        detailsPane.style.display = 'none';
+        toggleBtn.innerHTML = '📊 VIEW ANALYSIS DATA ▾';
+      } else {
+        detailsPane.style.display = 'block';
+        toggleBtn.innerHTML = '▴ HIDE ANALYSIS DATA';
+        document.getElementById('cg-card').scrollTo({ top: document.getElementById('cg-card').scrollHeight, behavior: 'smooth' });
+      }
     };
 
     const keyHandler = (e) => {
-      if (e.key === 'Escape') {
-        overlay.remove();
-        document.removeEventListener('keydown', keyHandler);
-        resolve('block');
-      }
+      if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', keyHandler); resolve('block'); }
     };
     document.addEventListener('keydown', keyHandler);
   });
 }
-/*
-function showRiskPopup(result, tx) {
-  return new Promise((resolve) => {
-    const existing = document.getElementById('cg-overlay');
-    if (existing) existing.remove();
-
-    const overlay = document.createElement('div');
-    overlay.id = 'cg-overlay';
-
-    // 1. DYNAMIC UI LOGIC (Red for Danger, Orange for Medium, Green for Safe)
-    const riskColor = result.risk >= 80 ? '#FF3B3B' : result.risk >= 50 ? '#FF8C00' : '#00FF88';
-    const riskEmoji = result.risk >= 80 ? '🚨' : result.risk >= 50 ? '⚠️' : '✅';
-    const riskLabel = result.risk >= 80 ? 'DANGER' : result.risk >= 50 ? 'HIGH RISK' : 'SAFE / SECURE';
-
-    // 2. DYNAMIC HINDI MESSAGING
-    let hindiMsg = `🇮🇳 यह लेनदेन सुरक्षित है। ${result.risk}% जोखिम – आप आगे बढ़ सकते हैं।`;
-    if (result.risk >= 80) hindiMsg = `🇮🇳 यह लेनदेन खतरनाक है! ${result.risk}% जोखिम – अपना पैसा बचाएं, BLOCK करें! 🛑`;
-    else if (result.risk >= 50) hindiMsg = `🇮🇳 चेतावनी! ${result.risk}% जोखिम – सावधानी से सोचें।`;
-
-    const slitherHtml = result.slither && result.slither.length > 0
-      ? result.slither.slice(0, 3).map(s =>
-          `<div class="cg-bug">🔴 Slither: ${escHtml(s)}</div>`
-        ).join('')
-      : '';
-
-    const whaleHtml = result.whale > 0
-      ? `<div class="cg-check">🐋 Whale concentration: <strong>${result.whale}%</strong> (top holder)</div>`
-      : '';
-
-    overlay.innerHTML = `
-      <style>
-        #cg-overlay {
-          position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-          background: rgba(0,0,0,0.82);
-          z-index: 2147483647;
-          display: flex; align-items: center; justify-content: center;
-          font-family: 'Segoe UI', system-ui, sans-serif;
-          backdrop-filter: blur(4px);
-        }
-        #cg-card {
-          background: #0D0D1A;
-          border: 2px solid ${riskColor};
-          border-radius: 16px;
-          padding: 28px 32px;
-          max-width: 480px; width: 90%;
-          box-shadow: 0 0 60px ${riskColor}44;
-          animation: cgSlideIn 0.3s cubic-bezier(0.34,1.56,0.64,1);
-        }
-        @keyframes cgSlideIn {
-          from { transform: translateY(-30px) scale(0.95); opacity: 0; }
-          to   { transform: translateY(0) scale(1); opacity: 1; }
-        }
-        #cg-risk-badge {
-          font-size: 42px; font-weight: 900;
-          color: ${riskColor};
-          text-align: center; margin: 8px 0 4px;
-          text-shadow: 0 0 30px ${riskColor}88;
-        }
-        #cg-label {
-          text-align: center; color: ${riskColor};
-          font-size: 13px; font-weight: 700; letter-spacing: 3px;
-          text-transform: uppercase; margin-bottom: 16px;
-        }
-        #cg-title { font-size: 18px; font-weight: 700; color: #fff; margin-bottom: 4px; }
-        #cg-ai { color: #ccc; font-size: 14px; line-height: 1.5; margin-bottom: 14px; border-left: 3px solid ${riskColor}; padding-left: 10px; }
-        .cg-check { color: #bbb; font-size: 13px; margin: 5px 0; }
-        .cg-bug { color: #ff6b6b; font-size: 13px; margin: 5px 0; background: #1a0808; padding: 4px 8px; border-radius: 4px; }
-        #cg-hindi { color: #f0c040; font-size: 13px; background: #1a1500; border-radius: 6px; padding: 8px 10px; margin: 12px 0; }
-        #cg-btns { display: flex; gap: 12px; margin-top: 18px; }
-        #cg-block {
-          flex: 1; background: #FF3B3B; color: #fff;
-          border: none; border-radius: 10px; padding: 14px;
-          font-size: 15px; font-weight: 700; cursor: pointer;
-          transition: transform 0.1s, box-shadow 0.2s;
-        }
-        #cg-block:hover { transform: scale(1.02); box-shadow: 0 0 20px #FF3B3B88; }
-        #cg-force {
-          flex: 1; background: transparent; color: #888;
-          border: 1px solid #444; border-radius: 10px; padding: 14px;
-          font-size: 13px; cursor: pointer;
-        }
-        #cg-force:hover { border-color: #888; color: #ccc; }
-        #cg-contract { font-size: 11px; color: #555; word-break: break-all; margin-top: 10px; }
-        #cg-loading { color: #888; font-size: 12px; text-align: center; margin-top: 8px; }
-        #cg-offline { color: #FF8C00; font-size: 11px; text-align: center; padding: 4px; }
-      </style>
-      <div id="cg-card">
-        <div style="text-align:center; font-size:28px">${riskEmoji}</div>
-        <div id="cg-risk-badge">${result.risk}% ${riskLabel}</div>
-        <div id="cg-label">ChainGuardian AI Analysis</div>
-        ${result.offline ? '<div id="cg-offline">⚡ Offline mode – backend unreachable</div>' : ''}
-        <div id="cg-ai">${escHtml(result.aiExplain || 'Risk signals detected.')}</div>
-        ${whaleHtml}
-        ${slitherHtml}
-        ${result.checks && result.checks.unlimited ? '<div class="cg-bug">🔴 Unlimited approval (uint256.max) detected</div>' : ''}
-        ${result.checks && result.checks.unverified ? '<div class="cg-check">❌ Contract source unverified on Etherscan</div>' : ''}
-        ${result.checks && result.checks.drainDetected ? '<div class="cg-bug">🔴 Balance drain detected in simulation</div>' : ''}
-        <div id="cg-hindi">
-          ${hindiMsg}
-        </div>
-        <div id="cg-contract">📍 Contract: ${tx.to || 'Unknown'}</div>
-        <div id="cg-btns">
-          <button id="cg-block">🛡️ BLOCK SAFE</button>
-          <button id="cg-force">⚡ Force Approve →</button>
-        </div>
-        <div id="cg-loading">ChainGuardian v1.0 | Sepolia Demo | 8-check AI engine</div>
-      </div>
-    `;
-
-    document.body.appendChild(overlay);
-
-    document.getElementById('cg-block').onclick = () => {
-      overlay.remove();
-      resolve('block');
-    };
-
-    document.getElementById('cg-force').onclick = () => {
-      overlay.remove();
-      resolve('approve');
-    };
-
-    const keyHandler = (e) => {
-      if (e.key === 'Escape') {
-        overlay.remove();
-        document.removeEventListener('keydown', keyHandler);
-        resolve('block');
-      }
-    };
-    document.addEventListener('keydown', keyHandler);
-  });
-} */
 
   // ─── Log intent on-chain ──────────────────────────────────────────────────────
-// ─── Log intent on-chain ──────────────────────────────────────────────────────
-async function logIntent(tx, result) {
-  console.log('[ChainGuardian] Intent logged (bypassed for demo)');
-  /* await fetch(`${BACKEND}/log-intent`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ user: tx.from, spender: tx.to, amount: tx.value || '0', riskScore: result.risk })
-  });
-  */
-}
+  async function logIntent(tx, result) {
+    console.log('[ChainGuardian] Intent logged (bypassed for demo)');
+  }
 
   // ─── HTML escape helper ───────────────────────────────────────────────────────
   function escHtml(str) {
@@ -464,75 +343,29 @@ async function logIntent(tx, result) {
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;');
   }
-// ─── AGGRESSIVE INTERCEPTOR ────────────────────────────────────────────────
-function startGuardian() {
-  // 1. Trap the setter: If Uniswap tries to use MetaMask, we patch it instantly
-  let _eth = window.ethereum;
-  Object.defineProperty(window, 'ethereum', {
-    get() { return _eth; },
-    set(val) {
-      _eth = val;
-      if (val) patchProvider(val);
-    },
-    configurable: true
-  });
 
-  // 2. Patch immediately if MetaMask is already there
-  if (window.ethereum) patchProvider(window.ethereum);
+  // ─── AGGRESSIVE INTERCEPTOR ────────────────────────────────────────────────
+  function startGuardian() {
+    let _eth = window.ethereum;
+    Object.defineProperty(window, 'ethereum', {
+      get() { return _eth; },
+      set(val) {
+        _eth = val;
+        if (val) patchProvider(val);
+      },
+      configurable: true
+    });
 
-  // 3. Mutation fallback for dynamic pages
-  const obs = new MutationObserver(() => {
-    if (window.ethereum && !window.ethereum.__chainGuardianPatched) {
-      patchProvider(window.ethereum);
-    }
-  });
-  obs.observe(document.documentElement, { childList: true, subtree: true });
-}
+    if (window.ethereum) patchProvider(window.ethereum);
 
-startGuardian();
-console.log('%c[ChainGuardian] 🛡️ AGGRESSIVE MODE ACTIVE', 'color:#00ff88;font-weight:bold;');
-})();
-  // ─── Hook all providers (MetaMask, Rabby, OKX, Coinbase) ─────────────────────
-  /*function hookAllProviders() {
-    if (window.ethereum) {
-      patchProvider(window.ethereum);
-
-      if (window.ethereum.providers) {
-        window.ethereum.providers.forEach(patchProvider);
-      }
-    }
-
-    if (window.okxwallet) patchProvider(window.okxwallet);
-    if (window.coinbaseWalletExtension) patchProvider(window.coinbaseWalletExtension);
-
-    const observer = new MutationObserver(() => {
+    const obs = new MutationObserver(() => {
       if (window.ethereum && !window.ethereum.__chainGuardianPatched) {
         patchProvider(window.ethereum);
       }
     });
-    observer.observe(document.documentElement, { childList: true, subtree: true });
+    obs.observe(document.documentElement, { childList: true, subtree: true });
   }
 
-  // ─── Override ethereum property to catch late setters ────────────────────────
-  // This must run BEFORE hookAllProviders so the setter intercepts the wallet's
-  // own injection (wallets set window.ethereum on DOMContentLoaded or earlier).
-  // If a dApp caches provider.request before we patch, we can't help that call —
-  // but this catches the vast majority of real-world injection timing.
-  let _ethereum = window.ethereum;
-  Object.defineProperty(window, 'ethereum', {
-    get() { return _ethereum; },
-    set(val) {
-      _ethereum = val;
-      patchProvider(val); // patch immediately when wallet injects
-    },
-    configurable: true
-  });
-
-  // Run immediately (catches already-present providers)
-  hookAllProviders();
-  // Run again after DOM + scripts settle (catches late injectors)
-  window.addEventListener('load', hookAllProviders);
-  // Diagnostic: if you DON'T see this log, the script itself isn't running in MAIN world
-  console.log('%c[ChainGuardian] 🛡️ Active – protecting all wallet providers', 'color:#00ff88;font-weight:bold;font-size:14px');
-  console.log('[ChainGuardian] window.ethereum at boot:', typeof window.ethereum);
-})(); */
+  startGuardian();
+  console.log('%c[ChainGuardian] 🛡️ AGGRESSIVE MODE ACTIVE', 'color:#00ff88;font-weight:bold;');
+})();

@@ -1,0 +1,14 @@
+{
+    "0x8b844f885672f333bc0042cb669255f93a4c1e6b": {
+      "name": "Uniswap Universal Router",
+      "type": "DEX Protocol"
+    },
+    "0x88757f2f99175387ab4c6a4b3067c77a695b0349": {
+      "name": "Aave: Pool V3",
+      "type": "Lending Protocol"
+    },
+    "0x13f4ea83d0bd40e75c8222255bc855a974568dd4": {
+      "name": "PancakeSwap: V3 Router",
+      "type": "DEX Protocol"
+    }
+  }
