@@ -22,6 +22,7 @@ contract IntentLog {
         address indexed user,
         address indexed spender,
         uint256 riskScore,
+        string aiReason, // ✨ PRO FEATURE ADDED
         uint256 timestamp
     );
 
@@ -75,13 +76,15 @@ contract IntentLog {
      * @param user The user whose tx was blocked
      * @param spender The blocked spender contract
      * @param riskScore Risk score that triggered the block
+     * @param aiReason The reason AI blocked the transaction
      */
     function logBlock(
         address user,
         address spender,
-        uint256 riskScore
+        uint256 riskScore,
+        string calldata aiReason // ✨ PRO FEATURE ADDED
     ) external onlyGuardian {
-        emit RiskBlocked(user, spender, riskScore, block.timestamp);
+        emit RiskBlocked(user, spender, riskScore, aiReason, block.timestamp); // ✨ FIXED EMIT
         totalBlocked++;
         userBlockedCount[user]++;
         flaggedContracts[spender] = true;
